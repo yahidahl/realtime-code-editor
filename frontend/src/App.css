@@ -83,11 +83,11 @@ button {
   flex-direction:column;
   justify-content:center;
   align-items:center;
-  margin0bottom:1rem;
+  margin-bottom:1rem;
   
   
   h2{
-  margin0bottom:1rem;
+  margin-bottom:1rem;
   font-size:1.5rem;
 
    } 
@@ -109,13 +109,13 @@ button {
       margin-left:.5rem;
       color:green;
       font-size:.8rem;
-      
+
     }
     }
 
     h3{
       margin-top:1.5rem;
-      margin0bottom:0.5rem;
+      margin-bottom:0.5rem;
       font-size:1rem;
     }
     ul{
