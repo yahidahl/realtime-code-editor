@@ -2,12 +2,13 @@ import express from "express";
 import http from "http";
 import { Server } from "socket.io";
 import path from "path";
+
 const app = express();
 
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173", // frontend origin
+    origin: "*", // allow all (or set to your frontend URL later)
     methods: ["GET", "POST"],
   },
 });
@@ -85,11 +86,13 @@ io.on("connection", (socket) => {
 });
 
 const port = process.env.PORT || 5000;
-const __dirname=path.resolve();
-app.use(express.static(path.join(__dirname,"/frontend/dist")))
-app.get("*",(req,res)=>{
-  res.sendFile(path.join(__dirname,"frontend","dist","index.html"))
-})
+const __dirname = path.resolve();
+
+// ✅ Only needed if frontend is built inside backend repo
+app.use(express.static(path.join(__dirname, "frontend", "dist")));
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "frontend", "dist", "index.html"));
+});
 
 server.listen(port, () => {
   console.log(`🚀 Server is running on port ${port}`);
