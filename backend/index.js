@@ -2,33 +2,40 @@ import express from "express";
 import http from "http";
 import { Server } from "socket.io";
 import path from "path";
+import { fileURLToPath } from "url";
+
+// ✅ Fix __dirname and __filename for ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
-
 const server = http.createServer(app);
+
+// ✅ Socket.IO server with CORS
 const io = new Server(server, {
   cors: {
-    origin: "*", // allow all (or set to your frontend URL later)
-    methods: ["GET", "POST"],
+    origin: "*",
   },
 });
 
+// Map to track users in rooms
 const rooms = new Map();
 
 io.on("connection", (socket) => {
-  console.log("✅ User connected:", socket.id);
+  console.log("User connected:", socket.id);
 
   let currentRoom = null;
   let currentUser = null;
 
-  // Join Room
+  // Join a room
   socket.on("join", ({ roomId, userName }) => {
     if (currentRoom) {
       socket.leave(currentRoom);
-      if (rooms.get(currentRoom)) {
-        rooms.get(currentRoom).delete(currentUser);
-        io.to(currentRoom).emit("userJoined", Array.from(rooms.get(currentRoom)));
-      }
+      rooms.get(currentRoom)?.delete(currentUser);
+      io.to(currentRoom).emit(
+        "userJoined",
+        Array.from(rooms.get(currentRoom) || [])
+      );
     }
 
     currentRoom = roomId;
@@ -39,61 +46,68 @@ io.on("connection", (socket) => {
     if (!rooms.has(roomId)) {
       rooms.set(roomId, new Set());
     }
-
     rooms.get(roomId).add(userName);
+
     io.to(roomId).emit("userJoined", Array.from(rooms.get(roomId)));
-
-    console.log(`👤 ${userName} joined room ${roomId}`);
+    console.log(`${userName} joined room ${roomId}`);
   });
 
-  // Code sync
-  socket.on("codeChange", ({ roomId, code }) => {
-    socket.to(roomId).emit("codeUpdate", code);
-  });
-
-  // Leave Room
-  socket.on("leaveRoom", () => {
-    if (currentRoom && currentUser) {
-      rooms.get(currentRoom)?.delete(currentUser);
-      io.to(currentRoom).emit("userJoined", Array.from(rooms.get(currentRoom) || []));
-
-      socket.leave(currentRoom);
-      console.log(`👋 ${currentUser} left room ${currentRoom}`);
-
-      currentRoom = null;
-      currentUser = null;
-    }
-  });
-
-  // Typing indicator
+  // Typing events
   socket.on("typing", ({ roomId, userName }) => {
     socket.to(roomId).emit("userTyping", userName);
   });
 
-  // Language change
+  socket.on("stopTyping", ({ roomId, userName }) => {
+    socket.to(roomId).emit("userStoppedTyping", userName);
+  });
+
+  // Code & language updates
+  socket.on("codeChange", ({ roomId, code }) => {
+    socket.to(roomId).emit("codeUpdate", code);
+  });
+
   socket.on("languageChange", ({ roomId, language }) => {
-    io.to(roomId).emit("languageUpdate", language);
+    socket.to(roomId).emit("languageUpdate", language);
+  });
+
+  // Leave room
+  socket.on("leaveRoom", () => {
+    if (currentRoom && currentUser) {
+      rooms.get(currentRoom)?.delete(currentUser);
+      io.to(currentRoom).emit(
+        "userJoined",
+        Array.from(rooms.get(currentRoom) || [])
+      );
+    }
+    socket.leave(currentRoom);
+    currentRoom = null;
+    currentUser = null;
   });
 
   // Disconnect
   socket.on("disconnect", () => {
     if (currentRoom && currentUser) {
       rooms.get(currentRoom)?.delete(currentUser);
-      io.to(currentRoom).emit("userJoined", Array.from(rooms.get(currentRoom) || []));
-      console.log(`❌ ${currentUser} disconnected from ${currentRoom}`);
+      io.to(currentRoom).emit(
+        "userJoined",
+        Array.from(rooms.get(currentRoom) || [])
+      );
     }
+    console.log("User disconnected:", socket.id);
   });
 });
 
-const port = process.env.PORT || 5000;
-const __dirname = path.resolve();
-
-console.log("📂 __dirname:", __dirname);
-console.log("📂 Serving static from:", path.join(__dirname, "frontend", "dist"));
-
+// ✅ Serve frontend build
 app.use(express.static(path.join(__dirname, "frontend", "dist")));
 
-app.get("*", (req, res) => {
-  console.log("📂 Sending:", path.join(__dirname, "frontend", "dist", "index.html"));
+// ✅ Express v5 requires "/*" or regex instead of "*"
+app.get(/.*/, (req, res) => {
   res.sendFile(path.join(__dirname, "frontend", "dist", "index.html"));
 });
+
+// Start server
+const PORT = process.env.PORT || 5000;
+server.listen(PORT, () => {
+  console.log(`✅ Server is running on port ${PORT}`);
+});
+
